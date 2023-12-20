@@ -20,8 +20,6 @@ defmodule Imgspider.MixProject do
 
   # Run "mix help deps" to learn about dependencies.
   defp deps do
-    [
-      {:req, "~> 0.1.0"}
-    ]
+    [{:finch, "~> 0.16.0"}]
   end
 end
