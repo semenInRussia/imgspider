@@ -53,7 +53,12 @@ defmodule Imgspider do
   def download_img(url, filename, opts \\ [])
 
   def download_img(url, {}, opts) do
-    filename = String.split(url, "/") |> List.last()
+    filename =
+      url
+      |> String.trim_trailing("/")
+      |> String.split("/")
+      |> List.last()
+
     download_img(url, filename, opts)
   end
 
