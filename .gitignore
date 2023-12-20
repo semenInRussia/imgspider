@@ -25,3 +25,4 @@ imgspider-*.tar
 # Temporary files, for example, from tests.
 /tmp/
 /imgs/
+/html/
