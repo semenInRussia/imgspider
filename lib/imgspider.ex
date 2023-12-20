@@ -5,11 +5,8 @@ defmodule Imgspider do
   A spider which download images from the html file.
   """
 
-  # The directory where images will be located.
-  @dest "./imgs/"
-
-  # The path to the file in which will be found images.
-  @html_file "./html/spartak1.html"
+  # The default directory where images will be located.
+  @dest "."
 
   # The regexp which indicates the URL to the images.
   @img_src_regexp "https://[^\"]*?\\.(?:png|jpg)"
@@ -29,44 +26,50 @@ defmodule Imgspider do
     Supervisor.init(children, strategy: :one_for_one)
   end
 
-  def scrapping(file) do
+  def scrapping(file, dest \\ @dest, reg \\ @img_src_regexp) do
     tasks =
       file
-      |> Imgspider.find_img_urls()
-      |> Enum.map(fn url -> Task.async(Imgspider, :download_img, [url, {}]) end)
+      |> Imgspider.find_img_urls(reg)
+      |> Enum.map(fn url -> Task.async(Imgspider, :download_img, [url, {}, [dest: dest]]) end)
 
     Task.await_many(tasks, :infinity)
   end
 
-  def download_img(url, {}) do
-    download_img(url, rewrite_if_exists?: false)
-  end
-
   @doc """
   Download the image at URL with last part of URL path as the filename.
+
+  If you need that filename of a file will be the path of filename in
+  URL, pass {} as a filename.
+
+  Opts can be the following:
+
+  :rewrite_if_exists?
+    should be True, if you expect download all files, including which
+    alread downloaded
+
+  :dest
+    the destination directory in which file will be saved
   """
-  def download_img(url, rewrite_if_exists?: rie?) do
+  def download_img(url, filename, opts \\ [])
+
+  def download_img(url, {}, opts) do
     filename = String.split(url, "/") |> List.last()
-    download_img(url, filename, rewrite_if_exists?: rie?)
+    download_img(url, filename, opts)
   end
 
-  @doc """
-  Donwload the image at URL as filename.
-  """
-  def download_img(url, filename, rewrite_if_exists?: rie?) do
-    unless File.exists?(@dest) do
-      File.mkdir(@dest)
+  def download_img(url, filename, opts) do
+    dest = Keyword.get(opts, :dest, @dest)
+
+    unless File.exists?(dest) do
+      File.mkdir(dest)
     end
 
+    rie? = Keyword.get(opts, :rewrite_if_exists?, false)
+    filename = Path.join(dest, filename)
+
     with true <- rie? or not File.exists?(filename),
-         req <- Finch.build(:get, url),
-         {:ok, res} <-
-           Finch.request(req, __MODULE__,
-             receive_timeout: @download_timeout,
-             pool_timeout: @download_timeout
-           ),
-         bytes <- res.body,
-         {:ok, file} <- File.open(Path.join(@dest, filename), [:write]),
+         bytes <- Imgspider.get_req(url),
+         {:ok, file} <- File.open(filename, [:write]),
          :ok <- IO.binwrite(file, bytes) do
       {:ok, :downloaded}
     else
@@ -75,24 +78,34 @@ defmodule Imgspider do
     end
   end
 
-  @doc """
-  Find URLs to images inside the default HTML file.
-  """
-  def find_img_urls() do
-    find_img_urls(@html_file)
+  def get_req(url) do
+    res =
+      Finch.build(:get, url)
+      |> Finch.request(__MODULE__,
+        receive_timeout: @download_timeout,
+        pool_timeout: @download_timeout
+      )
+
+    case res do
+      {:ok, res} -> res.body
+      err -> err
+    end
   end
 
   @doc """
   Find URLs to images inside HTML file with the given filename.
+
+  The filename of a HTML file defaults to the value of @html_file
+  attribute.
   """
-  def find_img_urls(filename) do
+  def find_img_urls(filename, reg \\ @img_src_regexp) do
     with {:ok, content} <- File.read(filename) do
-      Imgspider.matched_urls(content)
+      Imgspider.matched_urls(content, reg)
     end
   end
 
-  def matched_urls(text) do
-    {:ok, rx} = Regex.compile(@img_src_regexp)
+  def matched_urls(text, reg) do
+    {:ok, rx} = Regex.compile(reg)
     Regex.scan(rx, text) |> Enum.map(&hd/1)
   end
 end
