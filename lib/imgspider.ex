@@ -29,7 +29,7 @@ defmodule Imgspider do
   def scrapping(file, dest \\ @dest, reg \\ @img_src_regexp) do
     tasks =
       file
-      |> Imgspider.find_img_urls(reg)
+      |> find_img_urls(reg)
       |> Enum.map(fn url -> Task.async(Imgspider, :download_img, [url, {}, [dest: dest]]) end)
 
     Task.await_many(tasks, :infinity)
@@ -68,7 +68,7 @@ defmodule Imgspider do
     filename = Path.join(dest, filename)
 
     with true <- rie? or not File.exists?(filename),
-         bytes <- Imgspider.get_req(url),
+         bytes <- get_req(url),
          {:ok, file} <- File.open(filename, [:write]),
          :ok <- IO.binwrite(file, bytes) do
       {:ok, :downloaded}
@@ -78,7 +78,7 @@ defmodule Imgspider do
     end
   end
 
-  def get_req(url) do
+  defp get_req(url) do
     res =
       Finch.build(:get, url)
       |> Finch.request(__MODULE__,
@@ -92,19 +92,13 @@ defmodule Imgspider do
     end
   end
 
-  @doc """
-  Find URLs to images inside HTML file with the given filename.
-
-  The filename of a HTML file defaults to the value of @html_file
-  attribute.
-  """
-  def find_img_urls(filename, reg \\ @img_src_regexp) do
+  defp find_img_urls(filename, reg) do
     with {:ok, content} <- File.read(filename) do
-      Imgspider.matched_urls(content, reg)
+      matched_urls(content, reg)
     end
   end
 
-  def matched_urls(text, reg) do
+  defp matched_urls(text, reg) do
     {:ok, rx} = Regex.compile(reg)
     Regex.scan(rx, text) |> Enum.map(&hd/1)
   end
