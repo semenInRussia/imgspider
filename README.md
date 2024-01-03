@@ -35,7 +35,7 @@ children = [
 
 After that, you can fully enjoy the `Imgspider`.  For example, you can extract all pictures from the HTML file downloaded on your machine, for that use function `Imgspider.scrapping/3`
 
-You can just download ALLLLL **jpg** and **png** files from the file, using the most convinence `Imgspider.scrapping/1` interface
+You can just download ALLLLL **jpg** and **png** files from the HTML file or URL to the web page, using the most convinence `Imgspider.scrapping/1` interface
 
 ```elixir
 Imgspider.scrapping("index.html")

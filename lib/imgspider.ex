@@ -26,13 +26,15 @@ defmodule Imgspider do
     Supervisor.init(children, strategy: :one_for_one)
   end
 
-  def scrapping(file, dest \\ @dest, reg \\ @img_src_regexp) do
-    tasks =
-      file
-      |> find_img_urls(reg)
-      |> Enum.map(fn url -> Task.async(Imgspider, :download_img, [url, {}, [dest: dest]]) end)
+  def scrapping(file_or_url, dest \\ @dest, reg \\ @img_src_regexp) do
+    with {:ok, body} <- read_file_or_url(file_or_url) do
+      tasks =
+        body
+        |> matched_urls(reg)
+        |> Enum.map(fn url -> Task.async(Imgspider, :download_img, [url, {}, [dest: dest]]) end)
 
-    Task.await_many(tasks, :infinity)
+      Task.await_many(tasks, :infinity)
+    end
   end
 
   @doc """
@@ -73,13 +75,21 @@ defmodule Imgspider do
     filename = Path.join(dest, filename)
 
     with true <- rie? or not File.exists?(filename),
-         bytes <- get_req(url),
+         {:ok, bytes} <- get_req(url),
          {:ok, file} <- File.open(filename, [:write]),
          :ok <- IO.binwrite(file, bytes) do
       {:ok, :downloaded}
     else
       false -> {:ok, :skip}
       err -> err
+    end
+  end
+
+  defp read_file_or_url(path) do
+    if File.exists?(path) do
+      File.read(path)
+    else
+      get_req(path)
     end
   end
 
@@ -92,14 +102,8 @@ defmodule Imgspider do
       )
 
     case res do
-      {:ok, res} -> res.body
+      {:ok, res} -> {:ok, res.body}
       err -> err
-    end
-  end
-
-  defp find_img_urls(filename, reg) do
-    with {:ok, content} <- File.read(filename) do
-      matched_urls(content, reg)
     end
   end
 
