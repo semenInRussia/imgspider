@@ -94,6 +94,8 @@ defmodule Imgspider do
   end
 
   defp get_req(url) do
+    url = String.replace(url, "https://", "http://")
+
     res =
       Finch.build(:get, url)
       |> Finch.request(__MODULE__,
